@@ -2,6 +2,13 @@
 MoslimeベースのWindows向けMocopiのSlimeVRブリッジアプリ
 
 BluepyはLinuxでしか利用できないのでBleakを使ってMocopiの直接続を出来るツールを作成しました。
+
+免責事項
+このサードパーティソフトウェアはChatGPTにより作成されています。最低限の動作確認は行っていますが、ご利用は全て自己責任で行ってください。本ソフトを利用した不利益について一切の責任を負うことが出来ませんので予めご了承ください。
+Mocopiは Sony Corporation が所有する商標です。ベースになったMoSlime及び本ソフト は Sony Corporation や SlimeVR によって承認されていません。
+このソフトウェアは Mocopi自体を改造するものではありませんがこのソフトウェアを使用時点でそれに伴うリスクを負うことに同意したものとします。
+
+
 VScodeにてPython3.11を使って作成しました
 仮想環境を有効にしてBleakをインストールして下さい
  .\Scripts\Activate.ps1
