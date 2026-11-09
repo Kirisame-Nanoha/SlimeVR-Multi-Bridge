@@ -1,19 +1,21 @@
-# SlimeVR-Multi-Bridge
-MoslimeベースのWindows向けMocopiのSlimeVRブリッジアプリ
+# SlimeVR-Multi-Bridge (English Translation Reference)
+*Note: This document is provided for translation and reference purposes only.*
 
-BluepyはLinuxでしか利用できないのでBleakを使ってMocopiの直接続を出来るツールを作成しました。
+Mocopi SlimeVR Bridge App for Windows based on MoSlime
 
-免責事項
-このサードパーティソフトウェアはChatGPTにより作成されています。最低限の動作確認は行っていますが、ご利用は全て自己責任で行ってください。本ソフトを利用した不利益について一切の責任を負うことが出来ませんので予めご了承ください。
-Mocopiは Sony Corporation が所有する商標です。ベースになったMoSlime及び本ソフト は Sony Corporation や SlimeVR によって承認されていません。
-このソフトウェアは Mocopi自体を改造するものではありませんがこのソフトウェアを使用時点でそれに伴うリスクを負うことに同意したものとします。
+Since Bluepy is only available on Linux, this tool was created using Bleak to enable a direct connection with Mocopi on Windows.
 
+## Disclaimer
+This third-party software was created with the help of ChatGPT. Although basic functionality has been verified, please use it entirely at your own risk. Please note that the author takes absolute no responsibility for any disadvantages or damages incurred by using this software.
+Mocopi is a trademark owned by Sony Corporation. Neither MoSlime (the base software) nor this tool is endorsed or approved by Sony Corporation or SlimeVR.
+While this software does not modify the Mocopi hardware or official firmware itself, by using this software, you agree to accept all associated risks.
 
-VScodeにてPython3.11を使って作成しました
-仮想環境を有効にしてBleakをインストールして下さい
+## Setup & Requirements
+This project was developed using Python 3.11 in VS Code.
+Please activate your virtual environment and install Bleak:
  .\Scripts\Activate.ps1
 pip install bleak
 
-exeにする場合は以下を入れます
+If you want to compile the script into an executable (.exe), install the following:
 pip install pyinstaller
 pip install winrt
