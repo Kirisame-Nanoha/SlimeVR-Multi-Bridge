@@ -530,22 +530,22 @@ for i in range(6):
     raw_data_var = tk.StringVar(value="N/A")
     ttk.Label(root, textvariable=raw_data_var).grid(row=row_base+1, column=2, padx=10, pady=5, sticky="w")
 
-        single_tracker_button = ttk.Button(
-            root,
-            text="Start Single",
-            command=lambda t=i: start_single_tracker(trackers[t])
-        )
-        single_tracker_button.grid(row=row_base+1, column=3, padx=(10, 2), pady=5, sticky="e")
+    single_tracker_button = ttk.Button(
+        root,
+        text="Start Single",
+        command=lambda t=i: start_single_tracker(trackers[t])
+    )
+    single_tracker_button.grid(row=row_base+1, column=3, padx=(10, 2), pady=5, sticky="e")
 
-        single_stop_button = ttk.Button(
-            root,
-            text="Stop Single",
-            command=lambda t=i: on_stop_single(t)
-        )
-        single_stop_button.grid(row=row_base+1, column=4, padx=(2, 10), pady=5, sticky="w")
+    single_stop_button = ttk.Button(
+        root,
+        text="Stop Single",
+        command=lambda t=i: on_stop_single(t)
+    )
+    single_stop_button.grid(row=row_base+1, column=4, padx=(2, 10), pady=5, sticky="w")
 
-        tracker = SingleTracker(mac_var, status_var, raw_data_var, canvas, sensor_id=i)
-        trackers.append(tracker)
+    tracker = SingleTracker(mac_var, status_var, raw_data_var, canvas, sensor_id=i)
+    trackers.append(tracker)
 
 # # Scan Results Listbox
 listbox_label_row = 12
