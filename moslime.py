@@ -530,28 +530,24 @@ for i in range(6):
     raw_data_var = tk.StringVar(value="N/A")
     ttk.Label(root, textvariable=raw_data_var).grid(row=row_base+1, column=2, padx=10, pady=5, sticky="w")
 
-    tracker = SingleTracker(mac_var, status_var, raw_data_var, canvas, sensor_id=i)
-    trackers.append(tracker)
+        single_tracker_button = ttk.Button(
+            root,
+            text="Start Single",
+            command=lambda t=i: start_single_tracker(trackers[t])
+        )
+        single_tracker_button.grid(row=row_base+1, column=3, padx=(10, 2), pady=5, sticky="e")
 
-    def on_stop_single(t_idx):
-        print(f"Stopping connection routine task for Tracker #{t_idx + 1}...")
-        trackers[t_idx].is_running = False
+        single_stop_button = ttk.Button(
+            root,
+            text="Stop Single",
+            command=lambda t=i: on_stop_single(t)
+        )
+        single_stop_button.grid(row=row_base+1, column=4, padx=(2, 10), pady=5, sticky="w")
 
-    single_tracker_button = ttk.Button(
-        root,
-        text="Start Single",
-        command=lambda t=i: start_single_tracker(trackers[t])
-    )
-    single_tracker_button.grid(row=row_base+1, column=3, padx=10, pady=5, sticky="w")
+        tracker = SingleTracker(mac_var, status_var, raw_data_var, canvas, sensor_id=i)
+        trackers.append(tracker)
 
-    single_stop_button = ttk.Button(
-        root,
-        text="Stop Single",
-        command=lambda t=i: on_stop_single(t)
-    )
-    single_stop_button.grid(row=row_base+1, column=4, padx=10, pady=5, sticky="w")
-
-# Scan Results Listbox
+# # Scan Results Listbox
 listbox_label_row = 12
 ttk.Label(root, text="Scan Results:").grid(row=listbox_label_row, column=0, pady=10, padx=10, sticky="ne")
 mac_listbox = tk.Listbox(root, listvariable=mac_list_var, height=15, width=30, bg="#2e2e2e", fg="#ffffff", selectbackground="#444444")
@@ -580,9 +576,9 @@ def on_stop_all():
     bridge_running = False  # Tripping this flag breaks active loops instantly
 
 ttk.Button(button_frame, text="Start Bridge (All)", command=on_start_all).grid(row=0, column=2, padx=10)
-ttk.Button(button_frame, text="Stop Bridge", command=on_stop_all).grid(row=0, column=3, padx=10)
-ttk.Button(button_frame, text="Save Settings", command=lambda: save_config(trackers)).grid(row=0, column=4, padx=10)
-ttk.Button(button_frame, text="Load Settings", command=lambda: load_config(trackers)).grid(row=0, column=5, padx=10)
+ttk.Button(button_frame, text="Stop Bridge", command=on_stop_all).grid(row=1, column=2, padx=10, pady=5)
+ttk.Button(button_frame, text="Save Settings", command=lambda: save_config(trackers)).grid(row=0, column=3, padx=10)
+ttk.Button(button_frame, text="Load Settings", command=lambda: load_config(trackers)).grid(row=0, column=4, padx=10)
 
 load_config(trackers)
 root.mainloop()
