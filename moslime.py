@@ -288,81 +288,65 @@ async def maintain_connection(tracker: SingleTracker):
 # If successful, initiate maintain_connection loop and return
 # If unsuccessful, preserve Disconnected status parameters
 # ================================================
-async def connect_tracker_once(tracker: SingleTracker):
-    max_retries = 3
-    attempt = 0
-
-    while attempt < max_retries:
-        attempt += 1
-        tracker.status_var.set("Connecting")
-        update_status_icon(tracker.canvas, "Connecting")
-
-        try:
-            # Configure a shorter connection timeout threshold (10s)
-            tracker.client = BleakClient(tracker.mac_var.get(), timeout=10.0)
-            await tracker.client.connect()
-
-            # ----------------------------------------------------
-            # Attempt a hardware pairing link handshake if natively supported (Windows/limited environments only)
-            # ----------------------------------------------------
+async def connect_tracker_task(idx, mac, trackers):
+    """
+    Isolated smart-retry worker task. 
+    Manages a single tracker's connection loop independently without blocking others.
+    """
+    tracker = trackers[idx]
+    
+    while True:
+        if not tracker.client or not tracker.client.is_connected:
+            tracker.status_var.set("Connecting")
+            update_status_icon(tracker.canvas, "Connecting")
+            print(f"[Tracker {idx}] Attempting independent background connection to: {mac}")
+            
             try:
-                if hasattr(tracker.client, "pair"):
-                    await tracker.client.pair(protection_level=2)
-                    print(f"Pairing attempted for {tracker.mac_var.get()}")
-            except Exception as pair_err:
-                print(f"Pairing not supported or failed: {pair_err}")
-
-            # Connection successful
-            tracker.status_var.set("Connected")
-            update_status_icon(tracker.canvas, "Connected")
-            print(f"[Attempt {attempt}] Connected to {tracker.mac_var.get()} (Sensor ID={tracker.sensor_id})")
-
-            # Transmit initialization handshake packet to SlimeVR
-            fw_ver = "1.0.0"
-            tracker.pcounter += 1
-            handshake = build_handshake(tracker.mac_var.get(), fw_ver, tracker.pcounter)
-            tracker.sendto_slimevr(handshake)
-
-            # Pause briefly before initializing sensor configuration payloads
-            await asyncio.sleep(0.3)
-
-            tracker.pcounter += 1
-            sensor_info = build_sensor_info(tracker.pcounter, sensor_id=tracker.sensor_id)
-            tracker.sendto_slimevr(sensor_info)
-
-            # Start BLE notification stream updates
-            await tracker.client.start_notify(
-                DATA_CHAR_UUID,
-                lambda s, d: asyncio.create_task(notification_handler(s, d, tracker))
-            )
-            print(f"[{tracker.mac_var.get()}] Notification started.")
-
-            # Transmit mocopi streaming telemetry initiation command bytes
-            await tracker.client.write_gatt_char(
-                CMD_CHAR_UUID,
-                bytearray([0x7e, 0x03, 0x18, 0xd6, 0x01, 0x00, 0x00])
-            )
-            print(f"[{tracker.mac_var.get()}] Stream start command sent.")
-
-            # Initialize connection maintenance routine task (Non-blocking thread)
-            asyncio.create_task(maintain_connection(tracker))
-
-            # Exit loop routine if connection states succeed
-            return
-
-        except Exception as e:
-            tracker.status_var.set("Disconnected")
-            update_status_icon(tracker.canvas, "Disconnected")
-            print(f"[Attempt {attempt}] Error connecting to {tracker.mac_var.get()} (ID={tracker.sensor_id}): {e}")
-            if attempt < max_retries:
-                print(f"Retrying... (max {max_retries} attempts)")
-                await asyncio.sleep(2)  # Pause briefly before triggering sequential connection retries
-            else:
-                print(f"Failed to connect after {max_retries} attempts: {tracker.mac_var.get()}")
-
-    # Connection failure fallback; terminate sequential connection retries
-    tracker.status_var.set("Disconnected")
-    update_status_icon(tracker.canvas, "Disconnected")
+                tracker.client = BleakClient(mac, timeout=10.0)
+                await tracker.client.connect()
+                
+                # Windows hardware pairing compatibility layer
+                try:
+                    if hasattr(tracker.client, "pair"):
+                        await tracker.client.pair(protection_level=2)
+                        print(f"Pairing completed for {mac}")
+                except Exception as pair_err:
+                    print(f"Pairing not supported or failed: {pair_err}")
+                
+                # Transmit initialization handshake packets to SlimeVR
+                tracker.sendto_slimevr(build_handshake(tracker.pcounter, tracker.sensor_id))
+                tracker.pcounter += 1
+                await asyncio.sleep(0.5)
+                
+                tracker.sendto_slimevr(build_sensor_info(tracker.pcounter, tracker.sensor_id))
+                tracker.pcounter += 1
+                await asyncio.sleep(0.5)
+                
+                # Activate notification telemetry streaming
+                await tracker.client.start_notify(CHARACTERISTIC_UUID, tracker.notification_handler)
+                await tracker.client.write_gatt_char(COMMAND_UUID, bytearray([0x03, 0x00]))
+                
+                tracker.status_var.set("Connected")
+                update_status_icon(tracker.canvas, "Connected")
+                print(f"[Tracker {idx}] Connection established successfully.")
+                
+                # Hand over to connection maintenance tracking state worker
+                await maintain_connection(tracker)
+                
+            except Exception as e:
+                print(f"[Tracker {idx}] Connection error encountered: {e}")
+                tracker.status_var.set("Disconnected")
+                update_status_icon(tracker.canvas, "Disconnected")
+                
+                try:
+                    await tracker.disconnect()
+                except:
+                    pass
+                
+                print(f"[Tracker {idx}] Retrying independent connection cycle in 5 seconds...")
+                await asyncio.sleep(5.0)
+        else:
+            await asyncio.sleep(1.0)
 
 # ================================================
 # (A) Event loop to handle a single tracker connection layout instance
@@ -383,20 +367,28 @@ def start_single_tracker(tracker: SingleTracker):
     def background_single():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(single_main_loop(tracker))
+        
+        idx = tracker.sensor_id
+        mac = tracker.mac_var.get()
+        loop.run_until_complete(connect_tracker_task(idx, mac, trackers))
 
     threading.Thread(target=background_single, daemon=True).start()
 
-# ================================================
+# =======================================================
 # (B) Event loop block tracking automated batch updates array sequences
-# ================================================
+# =======================================================
 async def main_loop(trackers):
-    for t in trackers:
-        await connect_tracker_once(t)
-    print("All trackers processed.")
-    # Maintain active process pipeline state tracking loops
-    while True:
-        await asyncio.sleep(1)
+    # Launch all tracking unit tasks concurrently in parallel loops
+    tasks = []
+    for idx, t in enumerate(trackers):
+        mac = t.mac_var.get()
+        if mac and mac != "00:00:00:00:00:00":
+            tasks.append(asyncio.create_task(connect_tracker_task(idx, mac, trackers)))
+            
+    print(f"Spawned {len(tasks)} parallel background connection threads.")
+    
+    # Keep the task pool running concurrently forever
+    await asyncio.gather(*tasks)
 
 def start_background_loop(trackers):
     loop = asyncio.new_event_loop()
