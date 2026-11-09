@@ -327,8 +327,8 @@ async def connect_tracker_task(idx, mac, trackers):
                 await asyncio.sleep(0.5)
                 
                 # Activate notification telemetry streaming
-                await tracker.client.start_notify(CHARACTERISTIC_UUID, tracker.notification_handler)
-                await tracker.client.write_gatt_char(COMMAND_UUID, bytearray([0x03, 0x00]))
+                await tracker.client.start_notify(DATA_CHAR_UUID, tracker.notification_handler)
+                await tracker.client.write_gatt_char(CMD_CHAR_UUID, bytearray([0x03, 0x00]))
                 
                 tracker.status_var.set("Connected")
                 update_status_icon(tracker.canvas, "Connected")
