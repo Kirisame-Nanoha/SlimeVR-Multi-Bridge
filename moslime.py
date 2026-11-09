@@ -30,6 +30,7 @@ DEFAULT_MAC_ADDRESSES = [
 ]
 
 CONFIG_FILE = "config_six.json"
+bridge_running = False
 
 # ================================================
 # BLE Characteristic UUIDs (Mocopi Specs)
@@ -193,6 +194,7 @@ class SingleTracker:
         self.client = None
         self.pcounter = 0                  # Counter for SlimeVR transmissions
         self.sensor_id = sensor_id         # Unique ID to differentiate trackers
+        self.is_running = False
 
         # Allocate an independent socket for each tracker instance
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -293,9 +295,11 @@ async def connect_tracker_task(idx, mac, trackers):
     Isolated smart-retry worker task. 
     Manages a single tracker's connection loop independently without blocking others.
     """
+    global bridge_running
     tracker = trackers[idx]
     
-    while True:
+    tracker.is_running = True
+    while bridge_running and tracker.is_running:
         if not tracker.client or not tracker.client.is_connected:
             tracker.status_var.set("Connecting")
             update_status_icon(tracker.canvas, "Connecting")
@@ -314,7 +318,7 @@ async def connect_tracker_task(idx, mac, trackers):
                     print(f"Pairing not supported or failed: {pair_err}")
                 
                 # Transmit initialization handshake packets to SlimeVR
-                tracker.sendto_slimevr(build_handshake(tracker.pcounter, tracker.sensor_id))
+                tracker.sendto_slimevr(build_handshake(mac, "1.0.0", tracker.pcounter))
                 tracker.pcounter += 1
                 await asyncio.sleep(0.5)
                 
@@ -342,11 +346,21 @@ async def connect_tracker_task(idx, mac, trackers):
                     await tracker.disconnect()
                 except:
                     pass
-                
+                if not bridge_running or not tracker.is_running:
+                    break
                 print(f"[Tracker {idx}] Retrying independent connection cycle in 5 seconds...")
                 await asyncio.sleep(5.0)
         else:
             await asyncio.sleep(1.0)
+
+    # Clean cleanup execution if the bridge is toggled off
+    print(f"[Tracker {idx}] Terminating background task loop...")
+    tracker.status_var.set("Disconnected")
+    update_status_icon(tracker.canvas, "Disconnected")
+    try:
+        await tracker.disconnect()
+    except:
+        pass
 
 # ================================================
 # (A) Event loop to handle a single tracker connection layout instance
@@ -516,17 +530,26 @@ for i in range(6):
     raw_data_var = tk.StringVar(value="N/A")
     ttk.Label(root, textvariable=raw_data_var).grid(row=row_base+1, column=2, padx=10, pady=5, sticky="w")
 
-    # ** Added single tracker bridge start button **
-    # Use the form lambda t=tracker: ... to cleanly bind a tracker to the command parameter context
+    tracker = SingleTracker(mac_var, status_var, raw_data_var, canvas, sensor_id=i)
+    trackers.append(tracker)
+
+    def on_stop_single(t_idx):
+        print(f"Stopping connection routine task for Tracker #{t_idx + 1}...")
+        trackers[t_idx].is_running = False
+
     single_tracker_button = ttk.Button(
-        root, 
+        root,
         text="Start Single",
         command=lambda t=i: start_single_tracker(trackers[t])
     )
     single_tracker_button.grid(row=row_base+1, column=3, padx=10, pady=5, sticky="w")
 
-    tracker = SingleTracker(mac_var, status_var, raw_data_var, canvas, sensor_id=i)
-    trackers.append(tracker)
+    single_stop_button = ttk.Button(
+        root,
+        text="Stop Single",
+        command=lambda t=i: on_stop_single(t)
+    )
+    single_stop_button.grid(row=row_base+1, column=4, padx=10, pady=5, sticky="w")
 
 # Scan Results Listbox
 listbox_label_row = 12
@@ -540,12 +563,26 @@ button_frame.grid(row=listbox_label_row+1, column=1, columnspan=3, pady=10, padx
 ttk.Button(button_frame, text="Scan MACs", command=on_scan).grid(row=0, column=0, padx=10)
 ttk.Button(button_frame, text="Copy", command=on_copy).grid(row=0, column=1, padx=10)
 
+def on_clear_scan_log():
+    mac_list_var.set("")
+    print("Scan results terminal log cleared.")
+
+ttk.Button(button_frame, text="Clear Log", command=on_clear_scan_log).grid(row=1, column=0, padx=10, pady=5)
+
 def on_start_all():
+    global bridge_running
+    bridge_running = True  # Arm the master loop flag
     start_tracker(trackers)
 
+def on_stop_all():
+    global bridge_running
+    print("Stopping all tracking bridge connection tasks...")
+    bridge_running = False  # Tripping this flag breaks active loops instantly
+
 ttk.Button(button_frame, text="Start Bridge (All)", command=on_start_all).grid(row=0, column=2, padx=10)
-ttk.Button(button_frame, text="Save Settings", command=lambda: save_config(trackers)).grid(row=0, column=3, padx=10)
-ttk.Button(button_frame, text="Load Settings", command=lambda: load_config(trackers)).grid(row=0, column=4, padx=10)
+ttk.Button(button_frame, text="Stop Bridge", command=on_stop_all).grid(row=0, column=3, padx=10)
+ttk.Button(button_frame, text="Save Settings", command=lambda: save_config(trackers)).grid(row=0, column=4, padx=10)
+ttk.Button(button_frame, text="Load Settings", command=lambda: load_config(trackers)).grid(row=0, column=5, padx=10)
 
 load_config(trackers)
 root.mainloop()
